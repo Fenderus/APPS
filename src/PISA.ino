@@ -78,6 +78,8 @@ void setup() {
   pinMode(RIGHT_TEST_PIN, INPUT_PULLUP);
   pinMode(REJECT_TEST_PIN, INPUT_PULLUP);
   pinMode(ACCEPT_TEST_PIN, INPUT_PULLUP);
+
+  digitalWrite(LED_TEST_PIN, HIGH);
   
    // Set the button pin as input
 
@@ -265,7 +267,7 @@ void lcd_Time(){
   if (currentMillis - prevMillis > 1000){
     if(timeOn == true){
       currentTime -= 1;
-      digitalWrite(LED_TEST_PIN, HIGH);
+      digitalWrite(LED_TEST_PIN, LOW);
       if (currentPage == TIME) {
         displayMessage("Pump on: " + String(currentTime + 1), 1, false, true);
       }
@@ -273,7 +275,7 @@ void lcd_Time(){
         clearLine(0);
         timeOn = false;
         currentTime = 10;
-        digitalWrite(LED_TEST_PIN, LOW);
+        digitalWrite(LED_TEST_PIN, HIGH);
       }
     }
 
