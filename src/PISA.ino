@@ -34,6 +34,11 @@ typedef enum Pages{
   RESET_CONF
 };
 
+typedef enum Hour12{
+  AM,
+  PM
+};
+
 const int buttonPin = 2; // Define the button pin
 int buttonState = 0; // Variable for reading the button state
 bool isHelloWorld = true; // Variable to track the current state
@@ -45,6 +50,7 @@ int currentSecond;
 int currentMinute;
 int currentHour;
 int currentTimer = 10;
+Hour12 currentForm = AM;
 int currentNum = 1;
 Pages currentPage;
 int accept_state = HIGH;
@@ -286,11 +292,15 @@ void lcd_Time(){
   //Serial.println(String(timeOn));
 }
 
+
 void lcd_Place(){
+
+  int realMaxHour = militaryTime ? 23 : 12;
+
   if(currentNum == 1){
     if(digitalRead(DOWN_TEST_PIN) == HIGH){
       currentHour += 1;
-      if(currentHour > 23){
+      if(currentHour > realMaxHour){
         currentHour = 0;
       }
     }
@@ -298,7 +308,7 @@ void lcd_Place(){
     if(digitalRead(UP_TEST_PIN) == HIGH){
       currentHour -= 1;
       if(currentHour < 0){
-        currentHour = 23;
+        currentHour = realMaxHour;
       }
     }
   }
@@ -348,21 +358,40 @@ void lcd_Place(){
     }
   }
 
+  if(currentNum == 5){
+    if(digitalRead(DOWN_TEST_PIN) == LOW){
+      if (currentForm == AM)
+      {
+        currentForm = PM;
+      }
+    }
+
+    if(digitalRead(UP_TEST_PIN) == LOW){
+      if (currentForm == PM)
+      {
+        currentForm = AM;
+      }
+    }
+  }
+  
+
   int lefttistate = digitalRead(LEFT_TEST_PIN);
   int righttistate = digitalRead(RIGHT_TEST_PIN);
+
+  int numMil = militaryTime ? 4 : 5;
 
   if(righttistate == HIGH){
     currentNum -= 1;
 
     if(currentNum <= 0){
-      currentNum = 4;
+      currentNum = numMil;
     }
   }
 
   if(lefttistate == HIGH){
     currentNum += 1;
 
-    if(currentNum > 4){
+    if(currentNum > numMil){
       currentNum = 1;
     }
   }
@@ -370,9 +399,20 @@ void lcd_Place(){
   char timeString[12]; // Allocate space for 8 characters plus null terminator
   sprintf(timeString, "%02d:%02d:%02d>%02d", currentHour, currentMinute, currentSecond, currentTimer); // Format hours, minutes, and seconds into the string
 
+  String form;
+  if (!militaryTime)
+  {
+    if(currentForm == AM){
+      form = "AM";
+    }else if(currentForm == PM){
+      form = "PM";
+    }
+  }
+  
+
   //lcd.clear(); // Clear the LCD screen
   //lcd.setCursor(0, 0); // Set cursor to the first column of the first row
-  displayMessage(timeString, 0, false, true);
+  displayMessage(String(timeString) + " " + form, 0, false, true);
  // Clear the LCD screen
   //lcd.setCursor(0, 1); // Set cursor to the first column of the first row
   if(currentNum == 1){
@@ -387,6 +427,9 @@ void lcd_Place(){
   if(currentNum == 4){
     displayMessage("          ^", 1, false, true);
   }
+  if(!militaryTime && currentNum == 5){
+    displayMessage("             ^", 1, false, true);
+  }
 
   //int acc = digitalRead(ACCEPT_TEST_PIN);
 
@@ -394,7 +437,16 @@ void lcd_Place(){
     currentPage = LIST_SCHEDULES;
     //defaultTime.setTime(currentHour, currentMinute, currentSecond, currentTimer);
 
-    scheds[currentSelectedSchedule] = (CustomTime(currentHour, currentMinute, currentSecond, currentTimer));
+    int realHour = currentHour;
+
+    if(!militaryTime){
+      if (currentForm == PM)
+      {
+        realHour += 12;
+      }
+    }
+
+    scheds[currentSelectedSchedule] = (CustomTime(realHour, currentMinute, currentSecond, currentTimer));
   
     currentTime = scheds[currentSelectedSchedule].time;
     save(currentSelectedSchedule);
