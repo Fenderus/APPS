@@ -31,7 +31,8 @@ typedef enum Pages{
   TIME,
   NEW_SCHEDULE,
   LIST_SCHEDULES,
-  RESET_CONF
+  RESET_CONF,
+  SETTINGS
 };
 
 typedef enum Hour12{
@@ -42,10 +43,10 @@ typedef enum Hour12{
 const int buttonPin = 2; // Define the button pin
 int buttonState = 0; // Variable for reading the button state
 bool isHelloWorld = true; // Variable to track the current state
-int defaultTime = 10;
+int defaultTime = 60;
 int currentTime = 10;
 bool timeOn = false;
-bool militaryTime = true;
+bool militaryTime = false;
 int currentSecond;
 int currentMinute;
 int currentHour;
@@ -62,6 +63,8 @@ int currentInterv = 0;
 int currentSelectedSchedule = 0;
 String currentFirstText;
 String currentSecondText;
+int currentSetting = 0;
+bool useMinute = true;
 
 unsigned long prevMillis = millis();
 
@@ -102,12 +105,6 @@ void loop() {
   // button states:
   firstState();
 
-  //displayTime(now);
-  //edit.updating();
-  //lcd_Place();
-
-  
-
   if (currentPage == TIME) {
     showTime(now);
   }else if (currentPage == NEW_SCHEDULE) {
@@ -116,6 +113,8 @@ void loop() {
     showSchedules();
   }else if (currentPage == RESET_CONF){
     resetConfirmation();
+  }else if (currentPage == SETTINGS){
+    settings();
   }
 
 
@@ -202,7 +201,7 @@ void displayMessage(String line1, String line2) {
   lcd.print(line2); // Display line2 on the second row
 }
 
-void displayMessage(String line, int cursor, bool secondInterv, bool checkers) {
+void displayMessage(String line, int cursor, bool secondInterv = false, bool checkers = true) {
   if(secondInterv){
     if(!(currentInterv <= 0)){
       return;
@@ -256,8 +255,17 @@ void checkTime(const RtcDateTime& dt){
   for (int i = 0; i < arraySize; i++)
   {
     if(dt.Hour() == scheds[i].hour && dt.Minute() == scheds[i].minute && dt.Second() == scheds[i].second){
-      //Serial.println("Same Time");
-      currentTime = scheds[i].time;
+      if(scheds[i].hour == 0 && scheds[i].minute == 0 &&  scheds[i].second == 0)
+      {
+        return;
+      }
+
+      if (useMinute)
+      {
+        currentTime = scheds[i].time * 60;
+      }else{
+        currentTime = scheds[i].time;
+      }
       timeOn = true;
     } else{
       //Serial.println("Not Time");
@@ -462,14 +470,14 @@ void lcd_Place(){
 
 void showTime(const RtcDateTime& dt){
 
-  int hour = 0;
+  int hours = dt.Hour();
   String side = "AM";
   if(militaryTime){
-    hour = dt.Hour();
+    hours = dt.Hour();
     side = "";
   }else{
     if(dt.Hour() > 12){
-      hour = dt.Hour() - 12;
+      hours = dt.Hour() - 12;
       side = "pm";
     }else{
       side = "am";
@@ -477,7 +485,7 @@ void showTime(const RtcDateTime& dt){
   }
 
   char timeString[9]; // Allocate space for 8 characters plus null terminator
-    sprintf(timeString, "%02d:%02d:%02d", hour, dt.Minute(), dt.Second()); // Format hours, minutes, and seconds into the string
+    sprintf(timeString, "%02d:%02d:%02d", hours, dt.Minute(), dt.Second()); // Format hours, minutes, and seconds into the string
 
   displayMessage("Time: " + String(timeString) + side, 0, false, true);
   if (!timeOn)
@@ -496,8 +504,13 @@ void showTime(const RtcDateTime& dt){
     //Serial.println("Pressed");
   }
 
-  if(righttistate == LOW || lefttistate == LOW){
+  if(righttistate == LOW ){
     currentPage = LIST_SCHEDULES;
+    //Serial.println("Pressed");
+  }
+
+  if(lefttistate == LOW){
+    currentPage = SETTINGS;
     //Serial.println("Pressed");
   }
 
@@ -505,6 +518,12 @@ void showTime(const RtcDateTime& dt){
     if(!timeOn){
       currentTime = defaultTime;
       timeOn = true;
+    }
+  }
+
+  if(reject_state == HIGH && prev_reject_state == LOW){
+    if(timeOn){
+      currentTime = 0;
     }
   }
 }
@@ -573,7 +592,12 @@ void showSchedules(){
     }
   }
 
-  if(righttistate == LOW || lefttistate == LOW){
+  if(righttistate == LOW ){
+    currentPage = SETTINGS;
+    //Serial.println("Pressed");
+  }
+
+  if(lefttistate == LOW){
     currentPage = TIME;
     //Serial.println("Pressed");
   }
@@ -606,6 +630,78 @@ void resetConfirmation(){
   }
 }
 
+void settings(){
+  String militaryTimeText = "Military";
+  String minuteText = "Minutes";
+
+  if(militaryTime){
+    militaryTimeText = militaryTimeText + " true ";
+  }else{
+    militaryTimeText = militaryTimeText + " false";
+  }
+
+  if(useMinute){
+    minuteText = minuteText + "  true ";
+  }else{
+    minuteText = minuteText + "  false";
+  }
+
+  if(currentSetting == 0){
+    militaryTimeText = militaryTimeText + " <";
+
+    if(accept_state == HIGH && prev_accept_state == LOW){
+      militaryTime = true;
+    }
+
+    if(reject_state == HIGH && prev_reject_state == LOW){
+      militaryTime = false;
+    }
+  }else if(currentSetting == 1){
+    minuteText = minuteText + " <";
+
+    if(accept_state == HIGH && prev_accept_state == LOW){
+      useMinute = true;
+    }
+
+    if(reject_state == HIGH && prev_reject_state == LOW){
+      useMinute = false;
+    }
+  }
+
+  displayMessage(militaryTimeText, 0);
+  displayMessage(minuteText, 1);
+
+  int lefttistate = digitalRead(LEFT_TEST_PIN);
+  int righttistate = digitalRead(RIGHT_TEST_PIN);
+
+  if(righttistate == LOW ){
+    currentPage = TIME;
+    //Serial.println("Pressed");
+  }
+
+  if(lefttistate == LOW){
+    currentPage = LIST_SCHEDULES;
+    //Serial.println("Pressed");
+  }
+
+  int upState = digitalRead(UP_TEST_PIN);
+  int downState = digitalRead(DOWN_TEST_PIN);
+
+  if(downState == LOW){
+    currentSetting += 1;
+    if(currentSetting > 1){
+      currentSetting = 0;
+    }
+  }
+
+  if(upState == LOW){
+    currentSetting -= 1;
+    if(currentSetting < 0){
+      currentSetting = 1;
+    }
+  }
+}
+
 void save(int order){
   scheds[order].saveROM(order);
 }
@@ -625,5 +721,9 @@ void clearAll(){
 
   // Print message
   Serial.println("EEPROM Cleared!");
+
+}
+
+void checkTrue(String settingText, bool depend){
 
 }
